@@ -4,7 +4,7 @@
 // the command given.
 //
 // If no command is supplied, it pings the running instance.
-// Handy for quick compile + run keybindings, or anything repetetive.
+// Handy for quick compile + run keybindings, or anything repetitive.
 //
 // Not sure if there's already an existing program for this purpose, but hey
 // it's only 50 lines.
