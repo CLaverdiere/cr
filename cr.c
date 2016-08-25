@@ -15,11 +15,13 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 int main(int argc, char* argv[])
@@ -44,25 +46,46 @@ int main(int argc, char* argv[])
     // If a command argument is given, start a new process.
     if (argc == 3) {
         char* cmd = argv[2];
-
-        printf("Running command (on %c): %s\n", id, cmd);
         mkfifo(fifo_path, 0666);
+        pid_t old_pid = 0;
 
         while(1) {
             fd = open(fifo_path, O_RDONLY);
-
             if (fd == -1) {
                 fprintf(stderr, "%s\n", strerror(errno));
                 exit(EXIT_FAILURE);
             }
 
             read(fd, buf, 1);
-            system(cmd);
+            pid_t pid = fork();
+
+            if (pid == -1) {
+                fprintf(stderr, "Fork fail.\n");
+                exit(EXIT_FAILURE);
+
+            } else if (pid > 0) {
+                printf("Running command (on %c): %s\n", id, cmd);
+                if (waitpid(old_pid, NULL, WNOHANG) == 0 && old_pid != 0) {
+                    puts("Killing child");
+                    kill(old_pid * -1, SIGQUIT);
+                }
+                old_pid = pid;
+
+            } else {
+                setsid();
+                int status = system(cmd);
+                exit(status);
+            }
         }
 
         close(fd);
 
     } else { // No command argument given, just ping process <id>.
+        if (access(fifo_path, F_OK) == -1) {
+            fprintf(stderr, "No process running for id %c.\n", id);
+            exit(EXIT_FAILURE);
+        }
+
         fd = open(fifo_path, O_WRONLY);
 
         if (fd == -1) {
